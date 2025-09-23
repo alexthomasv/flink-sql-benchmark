@@ -1,5 +1,7 @@
 #!/bin/bash
-source ../common/env.sh
+export FLINK_HOME=/home/psladmin/repo/flink-sql-benchmark/packages/flink-1.16.0/
+
+source tools/common/env.sh
 num_iters=$1
 queryStatement=$2
 
