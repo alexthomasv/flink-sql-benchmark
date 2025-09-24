@@ -1,26 +1,34 @@
+#!/usr/bin/env bash
+# --- Config ---
+TPCDS_GIT_URL   ?= https://github.com/databricks/tpcds-kit.git
+TPCDS_SRC_DIR   ?= target/tpcds-kit
+TPCDS_TOOLS_DIR  = $(TPCDS_SRC_DIR)/tools
+DSDGEN_BIN       = $(TPCDS_TOOLS_DIR)/dsdgen
+DSQGEN_BIN       = $(TPCDS_TOOLS_DIR)/dsqgen
+DSDGEN_JAR       = target/lib/dsdgen.jar
 
-all: target/lib/dsdgen.jar target/hive-tpcds-setup-0.1-SNAPSHOT.jar
+# Default goal
+all: $(DSDGEN_JAR) target/hive-tpcds-setup-0.1-SNAPSHOT.jar
 
-target/hive-tpcds-setup-0.1-SNAPSHOT.jar: $(shell find . -name *.java)
+target/hive-tpcds-setup-0.1-SNAPSHOT.jar: $(shell find . -name '*.java')
 	mvn package
 
-target/tpcds_kit.zip: tpcds_kit.zip
-	mkdir -p target/
-	cp tpcds_kit.zip target/tpcds_kit.zip
+# Clone once
+$(TPCDS_SRC_DIR):
+	@mkdir -p target
+	git clone --depth 1 $(TPCDS_GIT_URL) $(TPCDS_SRC_DIR)
 
-tpcds_kit.zip:
-	curl https://public-repo-1.hortonworks.com/hive-testbench/tpcds/README
-	[[ -e tpcds_kit.zip ]] || curl --output tpcds_kit.zip https://public-repo-1.hortonworks.com/hive-testbench/tpcds/TPCDS_Tools.zip
+# Build dsdgen/dsqgen
+$(DSDGEN_BIN): $(TPCDS_SRC_DIR)
+	@command -v gcc >/dev/null || (sudo apt-get update -y && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y gcc make)
+	$(MAKE) -C $(TPCDS_TOOLS_DIR) clean
+	$(MAKE) -C $(TPCDS_TOOLS_DIR)
 
-target/lib/dsdgen.jar: target/tools/dsdgen
-	cd target/; mkdir -p lib/; ( jar cvf lib/dsdgen.jar tools/ || gjar cvf lib/dsdgen.jar tools/ )
-
-target/tools/dsdgen: target/tpcds_kit.zip
-	test -d target/tools/ || (cd target; unzip tpcds_kit.zip)
-	test -d target/tools/ || (cd target; mv */tools tools)
-	cd target/tools; cat ../../patches/all/*.patch | patch -p0
-	cd target/tools; cat ../../patches/${MYOS}/*.patch | patch -p1
-	cd target/tools; make clean; make dsdgen
+# Package a tiny jar with tools/ to match expected path
+$(DSDGEN_JAR): $(DSDGEN_BIN)
+	@mkdir -p target/lib
+	cd $(TPCDS_SRC_DIR) && ( jar cvf ../lib/dsdgen.jar tools/ || gjar cvf ../lib/dsdgen.jar tools/ )
 
 clean:
 	mvn clean
+	rm -rf $(TPCDS_SRC_DIR) $(DSDGEN_JAR)
