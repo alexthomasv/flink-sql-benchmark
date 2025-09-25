@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-source ../common/env.sh
+FLINK_BENCH_HOME=/home/psladmin/repo/flink-sql-benchmark
+source $FLINK_BENCH_HOME/tools/common/env.sh
 
-cd ${INSTALL_PATH}/hive-tpcds-setup
+export HIVE_OPTS="-u 'jdbc:hive2://localhost:10000/' -n $(whoami)"
+
+cd $FLINK_BENCH_HOME/hive-tpcds-setup
 ./tpcds-build.sh
 ./tpcds-setup.sh $SCALE
