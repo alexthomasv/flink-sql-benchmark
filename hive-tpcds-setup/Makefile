@@ -1,34 +1,38 @@
-#!/usr/bin/env bash
-# --- Config ---
-TPCDS_GIT_URL   ?= https://github.com/databricks/tpcds-kit.git
-TPCDS_SRC_DIR   ?= target/tpcds-kit
-TPCDS_TOOLS_DIR  = $(TPCDS_SRC_DIR)/tools
-DSDGEN_BIN       = $(TPCDS_TOOLS_DIR)/dsdgen
-DSQGEN_BIN       = $(TPCDS_TOOLS_DIR)/dsqgen
-DSDGEN_JAR       = target/lib/dsdgen.jar
+all: target/lib/dsdgen.jar target/hive-tpcds-setup-0.1-SNAPSHOT.jar
 
-# Default goal
-all: $(DSDGEN_JAR) target/hive-tpcds-setup-0.1-SNAPSHOT.jar
-
-target/hive-tpcds-setup-0.1-SNAPSHOT.jar: $(shell find . -name '*.java')
+target/hive-tpcds-setup-0.1-SNAPSHOT.jar: $(shell find . -name *.java)
 	mvn package
 
-# Clone once
-$(TPCDS_SRC_DIR):
-	@mkdir -p target
-	git clone --depth 1 $(TPCDS_GIT_URL) $(TPCDS_SRC_DIR)
+target/tpcds_kit.zip: tpcds_kit.zip
+	mkdir -p target/
+	cp tpcds_kit.zip target/tpcds_kit.zip
 
-# Build dsdgen/dsqgen
-$(DSDGEN_BIN): $(TPCDS_SRC_DIR)
-	@command -v gcc >/dev/null || (sudo apt-get update -y && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y gcc make)
-	$(MAKE) -C $(TPCDS_TOOLS_DIR) clean
-	$(MAKE) -C $(TPCDS_TOOLS_DIR)
+tpcds_kit.zip:
+	wget https://github.com/alexthomasv/hdfs-3.3.3/releases/download/flink/tpcds-kit.zip -O tpcds_kit.zip
 
-# Package a tiny jar with tools/ to match expected path
-$(DSDGEN_JAR): $(DSDGEN_BIN)
-	@mkdir -p target/lib
-	cd $(TPCDS_SRC_DIR) && ( jar cvf ../lib/dsdgen.jar tools/ || gjar cvf ../lib/dsdgen.jar tools/ )
+target/lib/dsdgen.jar: target/tools/dsdgen
+	cd target/; mkdir -p lib/; ( jar cvf lib/dsdgen.jar tools/ || gjar cvf lib/dsdgen.jar tools/ )
+
+target/tools/dsdgen: target/tpcds_kit.zip
+	# unpack once (safe to re-run)
+	test -d target/tools/ || (cd target; unzip -oq tpcds_kit.zip)
+	test -d target/tools/ || (cd target; mv */tools tools)
+
+	# apply common patches idempotently
+	@cd target/tools && \
+	for p in ../../patches/all/*.patch; do \
+		[ -e "$$p" ] || continue; \
+		patch -p0 -N --batch < "$$p" || true; \
+	done
+
+	# apply OS-specific patches idempotently
+	@cd target/tools && \
+	for p in ../../patches/$(MYOS)/*.patch; do \
+		[ -e "$$p" ] || continue; \
+		patch -p1 -N --batch < "$$p" || true; \
+	done
+
+	cd target/tools; make clean; make dsdgen
 
 clean:
 	mvn clean
-	rm -rf $(TPCDS_SRC_DIR) $(DSDGEN_JAR)
