@@ -57,19 +57,19 @@ if [ $SCALE -eq 1 ]; then
 fi
 
 # Do the actual data generation.
-hdfs dfs -mkdir -p ${DIR}
-hdfs dfs -ls ${DIR}/${SCALE} > /dev/null
+/usr/local/hadoop/bin/hdfs dfs -mkdir -p ${DIR}
+/usr/local/hadoop/bin/hdfs dfs -ls ${DIR}/${SCALE} > /dev/null
 if [ $? -ne 0 ]; then
 	echo "Generating data at scale factor $SCALE."
-	hadoop jar target/*.jar -d ${DIR}/${SCALE}/ -s ${SCALE}
+	/usr/local/hadoop/bin/hadoop jar target/*.jar -d ${DIR}/${SCALE}/ -s ${SCALE}
 fi
-hdfs dfs -ls ${DIR}/${SCALE} > /dev/null
+/usr/local/hadoop/bin/hdfs dfs -ls ${DIR}/${SCALE} > /dev/null
 if [ $? -ne 0 ]; then
 	echo "Data generation failed, exiting."
 	exit 1
 fi
 
-hadoop fs -chmod -R 777  ${DIR}/${SCALE}
+/usr/local/hadoop/bin/hadoop fs -chmod -R 777  ${DIR}/${SCALE}
 
 echo "TPC-DS text data generation complete."
 
